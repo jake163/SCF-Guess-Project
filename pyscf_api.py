@@ -18,7 +18,7 @@ def run_scf(molecule, basis, density = None, verbose = 4):
     mf.verbose = verbose
     mf.callback = get_cycles
     mf.kernel(density)
-    print(n_cycles)
+    return n_cycles
 
 
 if __name__ == "__main__":
@@ -31,4 +31,5 @@ if __name__ == "__main__":
 	    ("O", 1.0, 0.0, 0.0)
     ]
 
-    run_scf(mol, "sto-3g")
+    n_itr = run_scf(mol, "sto-3g")
+    print(n_itr)
