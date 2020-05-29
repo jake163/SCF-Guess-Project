@@ -31,5 +31,9 @@ if __name__ == "__main__":
         ("O", 1.0, 0.0, 0.0)
     ]
 
-    n_itr = run_scf(mol, "sto-3g")
-    print(n_itr)
+    rho_total  = density(mol, "sto-3g", 0)
+    n_itr_none = run_scf(mol, "sto-3g")
+    n_itr_rho  = run_scf(mol, "sto-3g", rho_total)
+    print(n_itr_none)
+    print(n_itr_rho)
+
