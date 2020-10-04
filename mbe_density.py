@@ -1,6 +1,8 @@
 import os
 import itertools
 import pyscf
+import numpy as np
+from wrap_pyscf import run_scf
 
 def load_molecule(file_path):
     mol = []
@@ -14,12 +16,11 @@ def load_molecule(file_path):
 def make_nmers(mono2atom, mol, n):
     nmers      = {}
     n_monomers = len(mono2atom)
-    monomers = [i for i in range(n_monomers)]
-    for nmer in itertools.combinations(monomers, n):
+    for nmer in itertools.combinations(range(n_monomers), n):
         nmers[tuple(nmer)] = []
         for mono in nmer:
             for atom in mono2atom[mono]:
-                nmers[(mono,)] += [mol[atom]]
+                nmers[(nmer)] += [mol[atom]]
     return nmers
 
 def compute_densities(nmers, bs):
@@ -34,10 +35,10 @@ def compute_densities(nmers, bs):
             nonlocal n_cycles
             if 'cycle' in locl: n_cycles = locl['cycle'] + 1
         mf = pyscf.scf.HF(mol)
-        mf.callback= get_cycles
+        mf.callback = get_cycles
         mf.kernel()
         data[tuple(tag)] = (n_cycles, mf.make_rdm1())
-    return data         
+    return data
 
 def atom2ao(mol, bs):
     ss = pyscf.gto.Mole()
@@ -48,22 +49,41 @@ def atom2ao(mol, bs):
 
 def make_guess(mono_densities, dimer_densities, mol, mono2atom,  bs):
     a2ao = atom2ao(mol, bs)
-    nbf  = a2ao[-1][-1]
-    rho = numpy.zeros([nbf, nbf])
-    for tag, data in dimer_densities:
-        for mono_i in tag:
-            for atom_i in mono2atom[mono_i]:
-                ss_start_i = a2ao[atom_i][2]
-                ss_end_i   = a2ao[atom_i][3]
-                nbf_i      = ss_end_i - ss_start_i
-                for offset_i in range(nbf_i):
-                    for mono_j in tag:
-                        for atom_j in mono2atom[mono_j]:
-                            ss_start_j = a2ao[atom_j][2]
-                            ss_end_j   = a2ao[atom_j][3]
-                            nbf_j      = ss_end_j - ss_start_j 
-                            for offset_j in range(nbf_j):
-                                rho[ss_start_i + offset_i, ss_start_j + offset_j] += data[1][offset_i, offset_j]
+    nbf = a2ao[-1][-1]
+    rho = np.zeros([nbf, nbf])
+
+    factor = -(len(mono_densities) - 2) if dimer_densities else 1
+    for tag, data in mono_densities.items():
+        atoms = []
+        for mono in tag:
+            atoms += mono2atom[mono]
+
+        guess_map = []
+        for atom in atoms:
+            atom_bs_start = a2ao[atom][2]
+            atom_bs_end   = a2ao[atom][3]
+            guess_map += range(atom_bs_start, atom_bs_end)
+
+        for tag_i, rho_i in enumerate(guess_map):
+            for tag_j, rho_j in enumerate(guess_map):
+                rho[rho_i, rho_j] += factor * data[1][tag_i, tag_j]
+
+    for tag, data in dimer_densities.items():
+        atoms = []
+        for mono in tag:
+            atoms += mono2atom[mono]
+
+        guess_map = []
+        for atom in atoms:
+            atom_bs_start = a2ao[atom][2]
+            atom_bs_end   = a2ao[atom][3]
+            guess_map += range(atom_bs_start, atom_bs_end)
+
+        for tag_i, rho_i in enumerate(guess_map):
+            for tag_j, rho_j in enumerate(guess_map):
+                rho[rho_i, rho_j] += data[1][tag_i, tag_j]
+
+    return rho
 
 
 if __name__ == '__main__':
@@ -74,15 +94,14 @@ if __name__ == '__main__':
     mono2atom = [[0, 1, 2], [3, 4, 5], [6, 7, 8]]
     bs = 'sto-3g'
 
-    monomers  = make_nmers(mono2atom, mol, 1)
-    dimers    = make_nmers(mono2atom, mol, 2)
-    trimer    = make_nmers(mono2atom, mol, 3)
-    
-    rhos = {}
-    rhos[1]  = compute_densities(monomers, bs)
-    rhos[2]  = compute_densities(dimers, bs)
-    rhos[3]  = compute_densities(trimer, bs)
-    
-    guess = make_guess(rhos[1], rhos[2], mol, bs)
-    run_scf(mol, bs, guess)
+    monomers = make_nmers(mono2atom, mol, 1)
+    dimers   = make_nmers(mono2atom, mol, 2)
 
+    rhos = {}
+    rhos[1] = compute_densities(monomers, bs)
+    rhos[2] = compute_densities(dimers, bs)
+
+    guess = make_guess(rhos[1], rhos[2], mol, mono2atom, bs)
+
+    run_scf(mol, bs, guess)
+    run_scf(mol, bs)
