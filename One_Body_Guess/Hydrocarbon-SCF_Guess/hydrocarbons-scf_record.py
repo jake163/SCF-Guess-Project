@@ -1,0 +1,2 @@
+{'EthaneA 1Cx2': (8, 7), 'PropaneA 1Cx3': (8, 8), 'PropaneA cc-c': (8, 8), 'ButaneA 1Cx4': (10, 10), 'ButaneA 2Cx2': (10, 10), 'ButaneA ccc-c': (10, 10), 
+ 'HexaneA 1Cx6': (10, 11), 'Hexane 2Cx3': (10, 10), 'Hexane 3Cx2': (10, 10)}
